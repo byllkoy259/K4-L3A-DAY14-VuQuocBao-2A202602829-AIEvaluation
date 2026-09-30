@@ -21,7 +21,16 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from dotenv import load_dotenv
-from openai import OpenAI, OpenAIError
+from openai import (
+    APIConnectionError,
+    InternalServerError,
+    OpenAI,
+    OpenAIError,
+    RateLimitError,
+)
+
+GENERATION_MAX_ATTEMPTS = 10
+GENERATION_BACKOFF_SECONDS = 5.0
 
 load_dotenv(Path(__file__).resolve().with_name(".env"))
 
@@ -250,20 +259,39 @@ class OpenAIGenerator:
             raise RuntimeError("OPENAI_API_KEY is missing from .env")
         if not self.model:
             raise RuntimeError("OPENAI_MODEL is missing from .env")
-        self.client = OpenAI(api_key=api_key)
-        self.max_output_tokens = max_output_tokens
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=os.getenv("OPENAI_BASE_URL", "").strip() or None,
+        )
+        # Reasoning models spend part of this budget on hidden thinking, so the
+        # cap can be raised through .env without changing the default of 300.
+        self.max_output_tokens = int(
+            os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "").strip() or max_output_tokens
+        )
 
     def generate(self, prompt: str) -> str:
-        response = self.client.responses.create(
-            model=self.model,
-            input=prompt,
-            temperature=0,
-            max_output_tokens=self.max_output_tokens,
-        )
-        answer = response.output_text.strip()
-        if not answer:
-            raise RuntimeError("OpenAI returned an empty answer")
-        return answer
+        # Uses the Chat Completions API because it is supported by every
+        # OpenAI-compatible provider (OpenAI, Gemini, OpenRouter, ...), unlike the
+        # Responses API. Free tiers are often rate-limited (429) or return an
+        # empty answer intermittently, so transient failures are retried.
+        for attempt in range(1, GENERATION_MAX_ATTEMPTS + 1):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                    max_tokens=self.max_output_tokens,
+                )
+                answer = (response.choices[0].message.content or "").strip()
+                if answer:
+                    return answer
+                error: Exception = RuntimeError("OpenAI returned an empty answer")
+            except (RateLimitError, APIConnectionError, InternalServerError) as exc:
+                error = exc
+            if attempt == GENERATION_MAX_ATTEMPTS:
+                raise error
+            time.sleep(min(GENERATION_BACKOFF_SECONDS * 2 ** (attempt - 1), 60))
+        raise AssertionError("unreachable")
 
 
 @dataclass(frozen=True)
