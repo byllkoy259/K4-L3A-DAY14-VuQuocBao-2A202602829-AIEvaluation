@@ -30,7 +30,7 @@ critical.
 
 | Metric | Acceptable Low Score Scenario | Critical Low Score Scenario | Action Required |
 |---|---|---|---|
-| Faithfulness (Độ trung thực / Không ảo giác) | Bot trả lời xã giao, chào hỏi hoặc bổ sung kiến thức thường thức hiển nhiên ngoài context. | Bot tự bịa đặt dữ liệu (hallucination) trong các nghiệp vụ nhạy cảm (y tế, tài chính, pháp lý, chính sách). | Tinh chỉnh prompt (bắt buộc dựa 100% vào context), giảm temperature, thêm guardrails kiểm tra trích dẫn. |
+| Faithfulness (Độ trung thực / Không ảo giác) | Câu trả lời chỉ thêm lời chào hoặc câu dẫn xã giao, không có thông tin sai và không dùng thông tin ngoài tài liệu. | Bot tự bịa đặt dữ liệu (hallucination) trong các nghiệp vụ nhạy cảm (y tế, tài chính, pháp lý, chính sách). | Tinh chỉnh prompt (bắt buộc dựa 100% vào context), giảm temperature, thêm guardrails kiểm tra trích dẫn. |
 | Answer Relevance (Độ đúng trọng tâm câu hỏi) | Bot chủ động từ chối lịch sự do câu hỏi ngoài phạm vi, hoặc hỏi ngược lại để làm rõ ý người dùng. | Bot trả lời lan man, lạc đề hoàn toàn, nói chuyện vòng vo không giải quyết đúng ý định câu hỏi. | Siết lại prompt sinh câu trả lời (buộc trả lời trực diện), cải thiện bước phân tích/viết lại query (query rewriting). |
 | Context Recall (Độ đầy đủ của dữ liệu tìm được) | Câu hỏi chỉ yêu cầu tóm tắt ý chính ngắn gọn, hoặc context dùng từ đồng nghĩa với ground truth. | Context tìm về thiếu các chi tiết sống còn, khiến LLM thiếu thông tin bắt buộc và phải trả lời cụt/đoán mò. | Tối ưu retrieval: tăng chunk size/overlap, chuyển sang hybrid search (BM25 + vector), mở rộng top-k. |
 | Context Precision (Độ chính xác và thứ tự của dữ liệu tìm được) | Cần lấy nhiều chunk phụ để so sánh dữ liệu đa tài liệu, miễn là chunk đúng vẫn nằm trong kết quả. | Chunk quan trọng bị tụt xuống cuối danh sách hoặc lẫn quá nhiều chunk rác gây nhiễu cho LLM. | Thêm bước Re-ranking (ví dụ Cohere/BGE), tối ưu hóa embedding model hoặc áp dụng bộ lọc filter/compress context. |
@@ -327,11 +327,11 @@ Hoàn thành `reflection.md` bằng kết quả thật từ Exercise 3.2.
 
 Hoàn thành kiểm tra cuối trong khoảng 16:50–17:00.
 
-- [ ] Tất cả required tests pass.
-- [ ] `golden_dataset.json` validate thành công.
-- [ ] Exercise 3.1 hoàn thành trong file JSON và bảng kết quả phía trên.
-- [ ] Exercise 3.2 có năm metrics, aggregate report và ba cases thấp nhất.
-- [ ] Exercise 3.3 có rubric 1–5 và bias controls.
-- [ ] `reflection.md` có ba failure analyses và regression strategy.
-- [ ] Đã copy `template.py` thành `solution/solution.py`.
+- [x] Tất cả required tests pass.
+- [x] `golden_dataset.json` validate thành công.
+- [x] Exercise 3.1 hoàn thành trong file JSON và bảng kết quả phía trên.
+- [x] Exercise 3.2 có năm metrics, aggregate report và ba cases thấp nhất.
+- [x] Exercise 3.3 có rubric 1–5 và bias controls.
+- [x] `reflection.md` có ba failure analyses và regression strategy.
+- [x] Đã copy `template.py` thành `solution/solution.py`.
 - [ ] Exercise 3.4 và 3.5 chỉ làm nếu chọn bonus.
