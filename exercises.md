@@ -30,11 +30,11 @@ critical.
 
 | Metric | Acceptable Low Score Scenario | Critical Low Score Scenario | Action Required |
 |---|---|---|---|
-| Faithfulness | | | |
-| Answer Relevance | | | |
-| Context Recall | | | |
-| Context Precision | | | |
-| Completeness | | | |
+| Faithfulness (Độ trung thực / Không ảo giác) | Bot trả lời xã giao, chào hỏi hoặc bổ sung kiến thức thường thức hiển nhiên ngoài context. | Bot tự bịa đặt dữ liệu (hallucination) trong các nghiệp vụ nhạy cảm (y tế, tài chính, pháp lý, chính sách). | Tinh chỉnh prompt (bắt buộc dựa 100% vào context), giảm temperature, thêm guardrails kiểm tra trích dẫn. |
+| Answer Relevance (Độ đúng trọng tâm câu hỏi) | Bot chủ động từ chối lịch sự do câu hỏi ngoài phạm vi, hoặc hỏi ngược lại để làm rõ ý người dùng. | Bot trả lời lan man, lạc đề hoàn toàn, nói chuyện vòng vo không giải quyết đúng ý định câu hỏi. | Siết lại prompt sinh câu trả lời (buộc trả lời trực diện), cải thiện bước phân tích/viết lại query (query rewriting). |
+| Context Recall (Độ đầy đủ của dữ liệu tìm được) | Câu hỏi chỉ yêu cầu tóm tắt ý chính ngắn gọn, hoặc context dùng từ đồng nghĩa với ground truth. | Context tìm về thiếu các chi tiết sống còn, khiến LLM thiếu thông tin bắt buộc và phải trả lời cụt/đoán mò. | Tối ưu retrieval: tăng chunk size/overlap, chuyển sang hybrid search (BM25 + vector), mở rộng top-k. |
+| Context Precision (Độ chính xác và thứ tự của dữ liệu tìm được) | Cần lấy nhiều chunk phụ để so sánh dữ liệu đa tài liệu, miễn là chunk đúng vẫn nằm trong kết quả. | Chunk quan trọng bị tụt xuống cuối danh sách hoặc lẫn quá nhiều chunk rác gây nhiễu cho LLM. | Thêm bước Re-ranking (ví dụ Cohere/BGE), tối ưu hóa embedding model hoặc áp dụng bộ lọc filter/compress context. |
+| Completeness (Độ trọn vẹn của câu trả lời) | Người dùng chỉ yêu cầu câu trả lời nhanh (quick check), không cần liệt kê toàn bộ chi tiết phụ. | Câu trả lời bỏ sót bước quy trình bắt buộc, điều kiện tiên quyết hoặc các trường hợp ngoại lệ quan trọng. | Cải thiện prompt (yêu cầu cấu trúc checklist/bullet points đủ ý), tăng số lượng chunk liên quan gửi vào context. |
 
 ### Exercise 1.2 — Bias trong LLM-as-a-Judge
 
@@ -46,15 +46,15 @@ Ba bias thường gặp:
 
 **Câu 1: Thiết kế experiment phát hiện position bias với ít nhất hai conditions.**
 
-> *Câu trả lời:*
+> Lấy một tập cặp câu trả lời (A, B), rồi cho judge chấm mỗi cặp hai lần: điều kiện 1 - thứ tự (A, B); điều kiện 2 - đảo thứ tự (B, A), nội dung giữ nguyên. Nếu judge chọn câu đứng trước nhiều hơn hẳn mức 50%, hoặc đổi kết quả khi chỉ đảo vị trí, thì có position bias. Nên chạy trên nhiều cặp và so sánh tỷ lệ thắng của vị trí đầu giữa hai điều kiện.
 
 **Câu 2: Làm thế nào giảm verbosity bias bằng rubric design?**
 
-> *Câu trả lời:*
+> Ghi rõ trong rubric rằng độ dài không được cộng điểm. Chấm theo tiêu chí cụ thể (đúng, đủ ý, bám context) và trừ điểm phần lan man hoặc lặp ý. Có thể thêm yêu cầu câu trả lời ngắn gọn, đúng trọng tâm ở mức điểm cao nhất.
 
 **Câu 3: Tại sao cần calibrate LLM judge với human labels?**
 
-> *Câu trả lời:*
+> Judge cũng là một model nên có thể thiên lệch (quá dễ dãi, quá khắt khe, hoặc thích câu dài). Phải so điểm của judge với điểm người chấm trên một tập mẫu (ví dụ bằng hệ số tương quan hoặc Cohen's kappa) để biết judge có đáng tin không. Nếu lệch nhiều thì chỉnh rubric hoặc prompt cho đến khi gần với người chấm.
 
 ### Exercise 1.3 — Evaluation trong CI/CD
 
@@ -62,13 +62,17 @@ Ba bias thường gặp:
 
 | Metric | Threshold | Lý do |
 |---|---:|---|
-| Faithfulness | | |
-| Answer Relevance | | |
-| Completeness | | |
+| Faithfulness | 0.80 | Bịa chính sách, thời hạn bảo hành hay phí hoàn tiền gây hại trực tiếp cho khách, nên đặt ngưỡng cao nhất. |
+| Answer Relevance | 0.70 | Lạc đề làm khách phải hỏi lại, gây khó chịu nhưng ít rủi ro hơn thông tin sai. |
+| Completeness | 0.70 | Thiếu ý hoặc thiếu điều kiện làm khách hiểu sai, nhưng thường không sai hẳn như hallucination. |
 
 **Câu 2: Khi nào dùng offline evaluation, online evaluation và human review?**
 
-> *Câu trả lời:*
+> Offline evaluation: chạy trên golden dataset trước mỗi lần deploy, làm quality gate trong CI/CD để chặn thay đổi làm điểm giảm.
+
+> Online evaluation: giám sát traffic thật sau khi deploy (điểm tự động trên mẫu hội thoại, phản hồi của khách, tỷ lệ chuyển sang nhân viên) để phát hiện lỗi mà dataset không bao phủ.
+
+> Human review: dùng cho các trường hợp rủi ro cao hoặc mơ hồ (hoàn tiền, bảo mật tài khoản), các mẫu judge chấm thấp hoặc không chắc, và để calibrate judge định kỳ.
 
 ---
 
